@@ -4,7 +4,7 @@
 
 如果你第一次接触 `CF-EMBY-PROXY-UI`[**自用备份：revproxy**]，建议按下面顺序上手。
 
-原作者：[@axuitomo](https://github.com/axuitomo)
+>  原作者：[@axuitomo](https://github.com/axuitomo)
 
 ## 第一步：先确认项目是否适合你
 

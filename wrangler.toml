@@ -1,0 +1,4 @@
+name = "revproxy"
+main = "_worker.js"
+compatibility_date = "2026-03-13"
+keep_vars = true

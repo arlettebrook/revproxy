@@ -1,5 +1,7 @@
 # revproxy
 
+> **当前版本：`v19.1fix`**
+
 # 快速开始
 
 如果你第一次接触 `CF-EMBY-PROXY-UI`[**自用备份：revproxy**]，建议按下面顺序上手。

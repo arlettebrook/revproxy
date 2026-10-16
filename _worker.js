@@ -14392,441 +14392,710 @@ function renderLandingPage(env, initHealth = buildInitHealth(env)) {
         : `<div class="mb-4 rounded-2xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-left text-amber-100"><div class="text-sm font-semibold">系统未初始化</div><div class="mt-1 text-xs leading-5 text-amber-50/90">缺少关键环境变量：${initHealth.missing.map(item => escapeHtml(item)).join('、')}</div></div>`;
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>反代延迟测试</title>
-<!-- 预连接：页面加载即提前建立TCP+TLS连接，消除首次握手开销 -->
-<link rel="preconnect" href="https://lyra.us.ci">
-<link rel="dns-prefetch" href="https://lyra.us.ci">
-<style>
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>反代延迟测试</title>
+  <!-- 维护提示：本文件是首页源码副本；实际部署的内容内联在 _worker.js 中（搜索 DOCTYPE html 即可定位），两处请保持一致。 -->
+  <!-- 预连接：使用当前站点地址（同 TARGET_URL = window.location.origin）提前建立 TCP+TLS 连接，消除首次握手开销 -->
+  <script>
+    (function () {
+      var preconnectOrigin = window.location.origin; // 与下方 TARGET_URL 保持一致
+      ["preconnect", "dns-prefetch"].forEach(function (rel) {
+        var el = document.createElement("link");
+        el.rel = rel;
+        el.href = preconnectOrigin;
+        document.head.appendChild(el);
+      });
+    })();
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-body {
-    background: radial-gradient(1200px 600px at 50% -10%, #1e293b 0%, #0f172a 60%, #020617 100%);
-    color: #f1f5f9;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
-}
+    body {
+      background: radial-gradient(1200px 600px at 50% -10%, #1e293b 0%, #0f172a 60%, #020617 100%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-.card {
-    width: 100%;
-    max-width: 380px;
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 20px;
-    padding: 36px 30px;
-    text-align: center;
-    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
-    border: 1px solid rgba(71, 85, 105, 0.6);
-    position: relative;
-    overflow: hidden;
-}
-
-.card::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.4), transparent);
-}
-
-h2 {
-    margin: 0 0 28px;
-    font-size: 20px;
-    font-weight: 600;
-    color: #e2e8f0;
-    letter-spacing: 0.3px;
-}
-
-/* ========== 核心：平均延迟（突出展示） ========== */
-.avg-latency {
-    margin-bottom: 24px;
-    text-align: center;
-}
-
-.avg-latency .latency-label {
-    font-size: 14px;
-    color: #94a3b8;
-    margin-bottom: 10px;
-    letter-spacing: 0.5px;
-    font-weight: 500;
-}
-
-.avg-latency .latency-value {
-    font-size: 68px;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    line-height: 1;
-    letter-spacing: -2px;
-    transition: all 0.3s ease;
-    background: linear-gradient(135deg, #60a5fa, #22d3ee);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.3));
-    display: inline-block;
-}
-
-.avg-latency.success .latency-value {
-    background: linear-gradient(135deg, #22c55e, #4ade80);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.4));
-}
-
-.avg-latency.warning .latency-value {
-    background: linear-gradient(135deg, #eab308, #facc15);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.4));
-}
-
-.avg-latency.danger .latency-value {
-    background: linear-gradient(135deg, #ef4444, #f87171);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.4));
-}
-
-.avg-latency.muted .latency-value {
-    background: #64748b;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: none;
-}
-
-.avg-latency .latency-value.update {
-    transform: scale(1.06);
-}
-
-/* ========== 本次延迟（次要展示） ========== */
-.current-latency {
-    font-size: 28px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    margin-bottom: 24px;
-    transition: color 0.3s ease;
-}
-
-.current-latency .current-label {
-    font-size: 14px;
-    color: #94a3b8;
-    font-weight: 400;
-    margin-right: 4px;
-}
-
-.current-latency.success .current-value { color: #22c55e; }
-.current-latency.warning .current-value { color: #eab308; }
-.current-latency.danger .current-value { color: #ef4444; }
-.current-latency.muted .current-value { color: #64748b; }
-
-.current-latency .current-value {
-    display: inline-block;
-    transition: transform 0.2s ease;
-}
-
-.current-latency .current-value.update {
-    transform: scale(1.05);
-}
-
-/* 进度条 */
-.progress-container {
-    width: 100%;
-    height: 6px;
-    background: rgba(51, 65, 85, 0.6);
-    border-radius: 999px;
-    margin-bottom: 20px;
-    overflow: hidden;
-}
-
-.progress-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
-    border-radius: 999px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.stats {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 14px;
-    color: #94a3b8;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-}
-
-.stats-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0 4px;
-}
-
-.status {
-    margin-top: 24px;
-    padding-top: 18px;
-    border-top: 1px solid rgba(51, 65, 85, 0.6);
-    font-size: 14px;
-    transition: color 0.25s ease;
-    min-height: 20px;
-}
-
-.status.normal { color: #22c55e; }
-.status.error { color: #ef4444; }
-.status.loading { color: #64748b; }
-
-.status.loading::after {
-    content: "";
-    display: inline-block;
-    width: 10px;
-    text-align: left;
-    animation: dots 1.4s infinite step-start;
-}
-
-@keyframes dots {
-    0%   { content: ""; }
-    25%  { content: "."; }
-    50%  { content: ".."; }
-    75%  { content: "..."; }
-    100% { content: ""; }
-}
-
-.test-btn {
-    margin-top: 20px;
-    width: 100%;
-    padding: 13px 0;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: #ffffff;
-    border: none;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-}
-
-.test-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-}
-
-.test-btn:active:not(:disabled) {
-    transform: translateY(0);
-}
-
-.test-btn:disabled {
-    background: #475569;
-    cursor: not-allowed;
-    opacity: 0.7;
-    box-shadow: none;
-}
-
-/* 醒目提示条 */
-.tip {
-    margin-top: 22px;
-    padding: 12px 14px;
-    background: rgba(234, 179, 8, 0.08);
-    border: 1px solid rgba(234, 179, 8, 0.25);
-    border-left: 4px solid #eab308;
-    border-radius: 10px;
-    font-size: 13px;
-    color: #fde68a;
-    line-height: 1.6;
-    text-align: left;
-}
-
-@media (max-width: 400px) {
     .card {
-        padding: 30px 22px;
+      width: 100%;
+      max-width: 380px;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 36px 30px;
+      text-align: center;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(71, 85, 105, 0.6);
+      position: relative;
+      overflow: hidden;
     }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.4), transparent);
+    }
+
+    h2 {
+      margin: 0 0 28px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.3px;
+    }
+
+    /* ========== 核心：平均延迟（突出展示） ========== */
+    .avg-latency {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .avg-latency .latency-label {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+
     .avg-latency .latency-value {
-        font-size: 56px;
+      font-size: 68px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      line-height: 1;
+      letter-spacing: -2px;
+      transition: all 0.3s ease;
+      background: linear-gradient(135deg, #60a5fa, #22d3ee);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.3));
+      display: inline-block;
     }
+
+    .avg-latency.success .latency-value {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.4));
+    }
+
+    .avg-latency.warning .latency-value {
+      background: linear-gradient(135deg, #eab308, #facc15);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.4));
+    }
+
+    .avg-latency.danger .latency-value {
+      background: linear-gradient(135deg, #ef4444, #f87171);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.4));
+    }
+
+    .avg-latency.muted .latency-value {
+      background: #64748b;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: none;
+    }
+
+    .avg-latency .latency-value.update {
+      transform: scale(1.06);
+    }
+
+    /* ========== 本次延迟（次要展示） ========== */
     .current-latency {
-        font-size: 24px;
+      font-size: 28px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      margin-bottom: 24px;
+      transition: color 0.3s ease;
     }
-}
-</style>
+
+    .current-latency .current-label {
+      font-size: 14px;
+      color: #94a3b8;
+      font-weight: 400;
+      margin-right: 4px;
+    }
+
+    .current-latency.success .current-value {
+      color: #22c55e;
+    }
+
+    .current-latency.warning .current-value {
+      color: #eab308;
+    }
+
+    .current-latency.danger .current-value {
+      color: #ef4444;
+    }
+
+    .current-latency.muted .current-value {
+      color: #64748b;
+    }
+
+    .current-latency .current-value {
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+
+    .current-latency .current-value.update {
+      transform: scale(1.05);
+    }
+
+    /* 进度条 */
+    .progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(51, 65, 85, 0.6);
+      border-radius: 999px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      border-radius: 999px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .stats {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      color: #94a3b8;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .status {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(51, 65, 85, 0.6);
+      font-size: 14px;
+      transition: color 0.25s ease;
+      min-height: 20px;
+    }
+
+    .status.normal {
+      color: #22c55e;
+    }
+
+    .status.error {
+      color: #ef4444;
+    }
+
+    .status.loading {
+      color: #64748b;
+    }
+
+    .status.loading::after {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      text-align: left;
+      animation: dots 1.4s infinite step-start;
+    }
+
+    @keyframes dots {
+      0% {
+        content: "";
+      }
+
+      25% {
+        content: ".";
+      }
+
+      50% {
+        content: "..";
+      }
+
+      75% {
+        content: "...";
+      }
+
+      100% {
+        content: "";
+      }
+    }
+
+    .test-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 13px 0;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+
+    .test-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .test-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .test-btn:disabled {
+      background: #475569;
+      cursor: not-allowed;
+      opacity: 0.7;
+      box-shadow: none;
+    }
+
+    .test-btn:focus-visible {
+      outline: 2px solid rgba(125, 211, 252, 0.85);
+      outline-offset: 3px;
+    }
+
+    /* 醒目提示条 */
+    .tip {
+      margin-top: 22px;
+      padding: 12px 14px;
+      background: rgba(234, 179, 8, 0.08);
+      border: 1px solid rgba(234, 179, 8, 0.25);
+      border-left: 4px solid #eab308;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #fde68a;
+      line-height: 1.6;
+      text-align: left;
+    }
+
+    /* 更多内容入口（Telegram 频道） */
+    .channel-link {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+      padding: 13px 14px;
+      border-radius: 16px;
+      overflow: hidden;
+      text-decoration: none;
+      text-align: left;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(15, 23, 42, 0.6) 62%, rgba(15, 23, 42, 0.34));
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35), inset 0 1px 0 rgba(226, 232, 240, 0.06);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .channel-link::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 170% at 6% -10%, rgba(56, 189, 248, 0.42), rgba(56, 189, 248, 0) 62%);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+
+    .channel-link:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 16px 38px rgba(2, 6, 23, 0.45), 0 0 0 1px rgba(56, 189, 248, 0.16), inset 0 1px 0 rgba(226, 232, 240, 0.08);
+    }
+
+    .channel-link:hover::after {
+      opacity: 1;
+    }
+
+    .channel-link:focus-visible {
+      outline: 2px solid rgba(125, 211, 252, 0.9);
+      outline-offset: 3px;
+    }
+
+    .channel-icon {
+      position: relative;
+      z-index: 1;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      color: #ffffff;
+      background: linear-gradient(135deg, #3ab6ea, #1b8ec4);
+      box-shadow: 0 6px 16px rgba(55, 174, 226, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .channel-link:hover .channel-icon {
+      transform: scale(1.04);
+      box-shadow: 0 8px 20px rgba(55, 174, 226, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+    }
+
+    .channel-icon svg {
+      display: block;
+      transform: translateX(-1px);
+    }
+
+    .channel-text {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .channel-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: #f1f5f9;
+    }
+
+    .channel-desc {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .channel-handle {
+      color: #7dd3fc;
+      font-weight: 500;
+    }
+
+    .channel-cta {
+      position: relative;
+      z-index: 1;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      color: #7dd3fc;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.26);
+      transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .channel-cta svg {
+      display: block;
+      transition: transform 0.22s ease;
+    }
+
+    .channel-link:hover .channel-cta {
+      color: #ffffff;
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+      border-color: rgba(125, 211, 252, 0.7);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .channel-link:hover .channel-cta svg {
+      transform: translateX(1.5px);
+    }
+
+    .channel-icon::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      box-shadow: 0 0 14px 2px rgba(56, 189, 248, 0.5);
+      opacity: 0.25;
+      animation: channel-breathe 3.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes channel-breathe {
+      0%,
+      100% {
+        opacity: 0.18;
+      }
+
+      50% {
+        opacity: 0.55;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .card {
+        padding: 30px 22px;
+      }
+
+      .avg-latency .latency-value {
+        font-size: 56px;
+      }
+
+      .current-latency {
+        font-size: 24px;
+      }
+
+      .channel-link {
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .channel-icon {
+        width: 34px;
+        height: 34px;
+      }
+
+      .channel-title {
+        font-size: 14px;
+      }
+
+      .channel-desc {
+        font-size: 11.5px;
+        white-space: normal;
+        overflow-wrap: break-word;
+      }
+
+      .channel-cta {
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .channel-icon::after {
+        animation: none;
+      }
+
+      .channel-link,
+      .channel-icon,
+      .channel-cta,
+      .channel-cta svg {
+        transition: none;
+      }
+
+      .channel-link:hover,
+      .channel-link:hover .channel-icon,
+      .channel-link:hover .channel-cta svg {
+        transform: none;
+      }
+    }
+
+  </style>
 </head>
+
 <body>
 
-<div class="card">
+  <div class="card">
     <h2>反代延迟测试</h2>
-    
+
     <!-- 核心视觉：平均延迟 -->
     <div class="avg-latency muted" id="avgLatency">
-        <div class="latency-label">平均延迟</div>
-        <div class="latency-value" id="avgValue">-- ms</div>
+      <div class="latency-label">平均延迟</div>
+      <div class="latency-value" id="avgValue">-- ms</div>
     </div>
-    
+
     <!-- 单次实时延迟（辅助） -->
     <div class="current-latency muted" id="currentLatency">
-        <span class="current-label">本次</span>
-        <span class="current-value" id="currentValue">-- ms</span>
+      <span class="current-label">本次</span>
+      <span class="current-value" id="currentValue">-- ms</span>
     </div>
-    
+
     <div class="progress-container">
-        <div class="progress-bar" id="progressBar"></div>
+      <div class="progress-bar" id="progressBar"></div>
     </div>
-    
+
     <div class="stats">
-        <div class="stats-row">
-            <span>最低：<span id="min">--</span> ms</span>
-            <span>最高：<span id="max">--</span> ms</span>
-        </div>
-        <div class="stats-row">
-            <span>成功率：<span id="successRate">--</span>%</span>
-            <span>已测：<span id="doneCount">0</span>/<span id="totalCount">5</span> 次</span>
-        </div>
+      <div class="stats-row">
+        <span>最低：<span id="min">--</span> ms</span>
+        <span>最高：<span id="max">--</span> ms</span>
+      </div>
+      <div class="stats-row">
+        <span>成功率：<span id="successRate">--</span>%</span>
+        <span>已测：<span id="doneCount">0</span>/<span id="totalCount">5</span> 次</span>
+      </div>
     </div>
-    
+
     <div class="status loading" id="status">正在初始化</div>
     <button id="startBtn" class="test-btn" disabled>重新测试</button>
-    
+
     <!-- 醒目提示文案 -->
     <div class="tip">为获得最佳体验，请使用不同的网络环境进行测试，延迟较高证明该反代并不适用于你。</div>
-</div>
 
-<script>
-// 配置参数（保持原有默认值不变）
-const TARGET_URL = window.location.origin;
-const TEST_INTERVAL = 1000; // 两次测试间隔（毫秒）
-const MAX_HISTORY = 20;
-const MAX_TEST_COUNT = 5;   // 单次测试总次数
-const REQUEST_TIMEOUT = 8000; // 请求超时时间（毫秒）
+    <!-- Telegram 频道入口：点击在新窗口打开 -->
+    <a class="channel-link" href="https://t.me/MikuNaNChannel" target="_blank" rel="noopener noreferrer" aria-label="Telegram 频道：更多内容 @MikuNaNChannel">
+      <span class="channel-icon" aria-hidden="true">
+        <svg viewBox="0 0 448 512" width="16" height="18" fill="currentColor">
+          <path d="M446.7 98.6l-67.6 318.8c-5.1 22.5-18.4 28.1-37.3 17.5l-103-75.9-49.7 47.8c-5.5 5.5-10.1 10.1-20.7 10.1l7.4-104.9 190.9-172.5c8.3-7.4-1.8-11.5-12.9-4.1L117.8 284 16.2 252.2c-22.1-6.9-22.5-22.1 4.6-32.7L418.2 66.4c18.4-6.9 34.5 4.1 28.5 32.2z"/>
+        </svg>
+      </span>
+      <span class="channel-text">
+        <span class="channel-title">Telegram 频道</span>
+        <span class="channel-desc">更多内容 · <span class="channel-handle">@MikuNaNChannel</span></span>
+      </span>
+      <span class="channel-cta" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9.2 6.6 14.6 12 9.2 17.4"/>
+        </svg>
+      </span>
+    </a>
+  </div>
 
-// DOM 元素
-const avgLatencyEl = document.getElementById("avgLatency");
-const avgValueEl = document.getElementById("avgValue");
-const currentLatencyEl = document.getElementById("currentLatency");
-const currentValueEl = document.getElementById("currentValue");
-const minEl = document.getElementById("min");
-const maxEl = document.getElementById("max");
-const statusEl = document.getElementById("status");
-const startBtn = document.getElementById("startBtn");
-const progressBar = document.getElementById("progressBar");
-const successRateEl = document.getElementById("successRate");
-const doneCountEl = document.getElementById("doneCount");
-const totalCountEl = document.getElementById("totalCount");
+  <script>
+    // 配置参数（保持原有默认值不变）
+    const TARGET_URL = window.location.origin;
+    const TEST_INTERVAL = 1000; // 两次测试间隔（毫秒）
+    const MAX_HISTORY = 20;
+    const MAX_TEST_COUNT = 5;   // 单次测试总次数
+    const REQUEST_TIMEOUT = 8000; // 请求超时时间（毫秒）
 
-// 状态变量
-let history = [];
-let timerId = null;
-let isTesting = false;
-let isPageVisible = !document.hidden;
-let currentTestCount = 0;
-let successCount = 0;
-let abortController = null;
+    // DOM 元素
+    const avgLatencyEl = document.getElementById("avgLatency");
+    const avgValueEl = document.getElementById("avgValue");
+    const currentLatencyEl = document.getElementById("currentLatency");
+    const currentValueEl = document.getElementById("currentValue");
+    const minEl = document.getElementById("min");
+    const maxEl = document.getElementById("max");
+    const statusEl = document.getElementById("status");
+    const startBtn = document.getElementById("startBtn");
+    const progressBar = document.getElementById("progressBar");
+    const successRateEl = document.getElementById("successRate");
+    const doneCountEl = document.getElementById("doneCount");
+    const totalCountEl = document.getElementById("totalCount");
 
-// 初始化总数显示
-totalCountEl.textContent = MAX_TEST_COUNT;
+    // 状态变量
+    let history = [];
+    let timerId = null;
+    let isTesting = false;
+    let isPageVisible = !document.hidden;
+    let currentTestCount = 0;
+    let successCount = 0;
+    let abortController = null;
 
-// 根据延迟值匹配状态色
-function getLatencyClass(ms) {
-    if (ms < 100) return "success";
-    if (ms < 300) return "warning";
-    return "danger";
-}
+    // 初始化总数显示
+    totalCountEl.textContent = MAX_TEST_COUNT;
 
-// 更新统计数据
-function updateStats() {
-    if (history.length === 0) {
+    // 根据延迟值匹配状态色
+    function getLatencyClass(ms) {
+      if (ms < 100) return "success";
+      if (ms < 300) return "warning";
+      return "danger";
+    }
+
+    // 更新统计数据
+    function updateStats() {
+      if (history.length === 0) {
         avgValueEl.textContent = "-- ms";
         avgLatencyEl.className = "avg-latency muted";
         minEl.textContent = "--";
         maxEl.textContent = "--";
         return;
+      }
+      const sum = history.reduce(function (a, b) { return a + b; }, 0);
+      const avg = Math.round(sum / history.length);
+
+      avgValueEl.textContent = avg + " ms";
+      avgLatencyEl.className = "avg-latency " + getLatencyClass(avg);
+      avgValueEl.classList.add("update");
+      setTimeout(() => avgValueEl.classList.remove("update"), 200);
+
+      minEl.textContent = Math.min.apply(null, history);
+      maxEl.textContent = Math.max.apply(null, history);
     }
-    const sum = history.reduce(function(a, b) { return a + b; }, 0);
-    const avg = Math.round(sum / history.length);
-    
-    avgValueEl.textContent = avg + " ms";
-    avgLatencyEl.className = "avg-latency " + getLatencyClass(avg);
-    avgValueEl.classList.add("update");
-    setTimeout(() => avgValueEl.classList.remove("update"), 200);
 
-    minEl.textContent = Math.min.apply(null, history);
-    maxEl.textContent = Math.max.apply(null, history);
-}
+    // 更新进度条与计数
+    function updateProgress() {
+      const percent = Math.min(100, (currentTestCount / MAX_TEST_COUNT) * 100);
+      progressBar.style.width = percent + "%";
+      doneCountEl.textContent = currentTestCount;
 
-// 更新进度条与计数
-function updateProgress() {
-    const percent = Math.min(100, (currentTestCount / MAX_TEST_COUNT) * 100);
-    progressBar.style.width = percent + "%";
-    doneCountEl.textContent = currentTestCount;
-    
-    if (currentTestCount === 0) {
+      if (currentTestCount === 0) {
         successRateEl.textContent = "--";
-    } else {
+      } else {
         const rate = Math.round((successCount / currentTestCount) * 100);
         successRateEl.textContent = rate;
+      }
     }
-}
 
-/**
- * 连接预热：不计入统计，仅用于建立TCP/TLS连接
- * 消除首次请求的握手开销，避免第一次测试数值虚高
- */
-async function warmupConnection() {
-    statusEl.className = "status loading";
-    statusEl.textContent = "正在预热连接";
+    /**
+     * 连接预热：不计入统计，仅用于建立TCP/TLS连接
+     * 消除首次请求的握手开销，避免第一次测试数值虚高
+     */
+    async function warmupConnection() {
+      statusEl.className = "status loading";
+      statusEl.textContent = "正在预热连接";
 
-    try {
+      try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
         await fetch(TARGET_URL + "?t=" + Date.now() + "&warmup=1", {
-            cache: "no-store",
-            mode: "no-cors",
-            method: "GET",
-            signal: controller.signal
+          cache: "no-store",
+          mode: "no-cors",
+          method: "GET",
+          signal: controller.signal
         });
         clearTimeout(timeoutId);
-    } catch (err) {
+      } catch (err) {
         // 预热失败不影响正式测试流程
+      }
     }
-}
 
-// 单次延迟测试
-async function runTest() {
-    if (isTesting) return;
-    isTesting = true;
+    // 单次延迟测试
+    async function runTest() {
+      if (isTesting) return;
+      isTesting = true;
 
-    statusEl.className = "status loading";
-    statusEl.textContent = "测试中（第" + (currentTestCount + 1) + "/" + MAX_TEST_COUNT + "次）";
+      statusEl.className = "status loading";
+      statusEl.textContent = "测试中（第" + (currentTestCount + 1) + "/" + MAX_TEST_COUNT + "次）";
 
-    if (abortController) {
+      if (abortController) {
         abortController.abort();
-    }
-    abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT);
+      }
+      abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT);
 
-    try {
+      try {
         const startTime = performance.now();
         await fetch(TARGET_URL + "?t=" + Date.now() + "&r=" + Math.random().toString(36).slice(2), {
-            cache: "no-store",
-            mode: "no-cors",
-            method: "GET",
-            signal: abortController.signal
+          cache: "no-store",
+          mode: "no-cors",
+          method: "GET",
+          signal: abortController.signal
         });
         const latency = Math.round(performance.now() - startTime);
 
@@ -14845,119 +15114,120 @@ async function runTest() {
         statusEl.className = "status normal";
         statusEl.textContent = "连接正常";
 
-    } catch (err) {
+      } catch (err) {
         currentLatencyEl.className = "current-latency danger";
         currentValueEl.textContent = "失败";
         currentValueEl.classList.add("update");
         setTimeout(() => currentValueEl.classList.remove("update"), 200);
-        
+
         updateProgress();
-        
+
         statusEl.className = "status error";
         if (err.name === "AbortError") {
-            statusEl.textContent = "请求超时，节点不可达";
+          statusEl.textContent = "请求超时，节点不可达";
         } else {
-            statusEl.textContent = "节点不可达或请求被拦截";
+          statusEl.textContent = "节点不可达或请求被拦截";
         }
-    } finally {
+      } finally {
         clearTimeout(timeoutId);
         isTesting = false;
         currentTestCount++;
         updateProgress();
+      }
     }
-}
 
-// 串行调度
-function scheduleNextTest() {
-    if (timerId) {
+    // 串行调度
+    function scheduleNextTest() {
+      if (timerId) {
         clearTimeout(timerId);
         timerId = null;
-    }
+      }
 
-    if (currentTestCount >= MAX_TEST_COUNT) {
+      if (currentTestCount >= MAX_TEST_COUNT) {
         statusEl.className = "status normal";
         statusEl.textContent = "测试完成（共" + MAX_TEST_COUNT + "次）";
         startBtn.disabled = false;
         return;
-    }
+      }
 
-    if (isPageVisible) {
-        timerId = setTimeout(async function() {
-            await runTest();
-            scheduleNextTest();
+      if (isPageVisible) {
+        timerId = setTimeout(async function () {
+          await runTest();
+          scheduleNextTest();
         }, TEST_INTERVAL);
+      }
     }
-}
 
-// 重置并开始新一轮测试（先预热再正式测试）
-async function startNewTest() {
-    if (abortController) {
+    // 重置并开始新一轮测试（先预热再正式测试）
+    async function startNewTest() {
+      if (abortController) {
         abortController.abort();
+      }
+
+      clearTimeout(timerId);
+      timerId = null;
+      currentTestCount = 0;
+      successCount = 0;
+      history = [];
+      isTesting = false;
+
+      // 重置界面状态
+      avgLatencyEl.className = "avg-latency muted";
+      avgValueEl.textContent = "-- ms";
+      currentLatencyEl.className = "current-latency muted";
+      currentValueEl.textContent = "-- ms";
+
+      minEl.textContent = "--";
+      maxEl.textContent = "--";
+      successRateEl.textContent = "--";
+      doneCountEl.textContent = "0";
+      progressBar.style.width = "0%";
+      startBtn.disabled = true;
+
+      // 先预热连接，再开始正式测试
+      await warmupConnection();
+      runTest();
+      scheduleNextTest();
     }
-    
-    clearTimeout(timerId);
-    timerId = null;
-    currentTestCount = 0;
-    successCount = 0;
-    history = [];
-    isTesting = false;
 
-    // 重置界面状态
-    avgLatencyEl.className = "avg-latency muted";
-    avgValueEl.textContent = "-- ms";
-    currentLatencyEl.className = "current-latency muted";
-    currentValueEl.textContent = "-- ms";
-    
-    minEl.textContent = "--";
-    maxEl.textContent = "--";
-    successRateEl.textContent = "--";
-    doneCountEl.textContent = "0";
-    progressBar.style.width = "0%";
-    startBtn.disabled = true;
-
-    // 先预热连接，再开始正式测试
-    await warmupConnection();
-    runTest();
-    scheduleNextTest();
-}
-
-// 页面可见性监听
-document.addEventListener("visibilitychange", function() {
-    isPageVisible = !document.hidden;
-    if (isPageVisible) {
+    // 页面可见性监听
+    document.addEventListener("visibilitychange", function () {
+      isPageVisible = !document.hidden;
+      if (isPageVisible) {
         if (currentTestCount < MAX_TEST_COUNT) {
-            runTest();
-            scheduleNextTest();
+          runTest();
+          scheduleNextTest();
         }
-    } else {
+      } else {
         clearTimeout(timerId);
         timerId = null;
         if (abortController && isTesting) {
-            abortController.abort();
+          abortController.abort();
         }
         if (currentTestCount < MAX_TEST_COUNT) {
-            statusEl.className = "status loading";
-            statusEl.textContent = "已暂停（后台运行）";
+          statusEl.className = "status loading";
+          statusEl.textContent = "已暂停（后台运行）";
         }
-    }
-});
+      }
+    });
 
-startBtn.addEventListener("click", startNewTest);
+    startBtn.addEventListener("click", startNewTest);
 
-window.addEventListener("beforeunload", function() {
-    clearTimeout(timerId);
-    if (abortController) abortController.abort();
-});
+    window.addEventListener("beforeunload", function () {
+      clearTimeout(timerId);
+      if (abortController) abortController.abort();
+    });
 
-// 页面加载完成后，先预热再启动正式测试
-window.addEventListener("load", async function() {
-    await warmupConnection();
-    runTest();
-    scheduleNextTest();
-});
-</script>
+    // 页面加载完成后，先预热再启动正式测试
+    window.addEventListener("load", async function () {
+      await warmupConnection();
+      runTest();
+      scheduleNextTest();
+    });
+  </script>
 
 </body>
+
 </html>`
     // const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="/favicon.ico" sizes="any"><title>Emby Proxy V19.1</title><script src="https://cdn.tailwindcss.com/3.4.17"></script></head><body class="bg-slate-950 text-slate-100 min-h-screen"><main class="min-h-screen flex items-center justify-center px-6 py-12"><section class="max-w-3xl w-full rounded-[32px] border border-slate-800 bg-slate-900/95 shadow-2xl overflow-hidden"><div class="grid gap-0 md:grid-cols-[1.1fr,0.9fr]"><div class="p-8 md:p-10 text-left">${initBanner}<div class="inline-flex items-center rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-semibold tracking-[0.16em] uppercase text-brand-300">Headless Edge Relay</div><h1 class="mt-5 text-3xl md:text-4xl font-bold text-white leading-tight">Emby Proxy V19.1</h1><p class="mt-4 text-sm md:text-base leading-7 text-slate-300">为了极致优化视频代理的性能，当前根路径默认只保留一个无头（Headless）数据中继站；真正的管理界面、节点控制和 DNS 运维都收敛到单独的管理台入口。</p><p class="mt-3 text-sm md:text-base leading-7 text-slate-400">如果你现在需要配置节点、查看运行状态或调整 Cloudflare 相关参数，请直接访问 <span class="font-semibold text-white">${escapeHtml(adminPath)}</span>。</p><div class="mt-8 flex flex-col sm:flex-row gap-3"><a href="${escapeHtml(adminPath)}" class="inline-flex items-center justify-center rounded-2xl border border-brand-400/70 bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-brand-950/20 transition hover:border-brand-300 hover:bg-brand-700">访问 ${escapeHtml(adminPath)}</a><a href="https://github.com/arlettebrook/revproxy" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-800 transition">查看项目说明</a></div></div><div class="border-t md:border-t-0 md:border-l border-slate-800 bg-slate-950/80 p-8 md:p-10 text-left"><div class="rounded-3xl border border-slate-800 bg-slate-900/70 p-6"><div class="text-xs font-semibold tracking-[0.16em] uppercase text-slate-500">Routing Notes</div><ul class="mt-4 space-y-3 text-sm leading-6 text-slate-300"><li>• 根路径仅提供静态说明页，不承载实时配置数据。</li><li>• \`${escapeHtml(adminPath)}\` 下发 SaaS 控制台骨架，动态数据继续走 \`POST ${escapeHtml(adminPath)}\` API。</li><li>• 媒体代理、日志与 KV / D1 逻辑保持原 Worker 主链路不变。</li></ul></div></div></div></section></main></body></html>`;
     const headers = new Headers({ 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'public, max-age=3600, s-maxage=86400' });
